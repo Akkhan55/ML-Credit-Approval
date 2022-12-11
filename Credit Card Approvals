@@ -1,0 +1,115 @@
+import pandas as pd
+cc_apps = pd.read_csv("datasets/cc_approvals.data", header=None)
+cc_apps.head()
+cc_apps_description = cc_apps.describe()
+print(cc_apps_description)
+print('\n')
+
+# DataFrame information
+cc_apps_info = cc_apps.info()
+print(cc_apps_info)
+
+print('\n')
+
+# in the dataset
+cc_apps.tail(17)
+
+# Import train_test_split
+from sklearn.model_selection import train_test_split
+
+# Drop 11 and 13 (Local)
+cc_apps = cc_apps.drop([11, 13], axis=1)
+
+# train and test sets
+cc_apps_train, cc_apps_test = train_test_split(cc_apps, test_size=0.33, random_state=42)
+
+# Import numpy
+import numpy as np
+
+# NaN in the train and test sets
+cc_apps_train = cc_apps_train.replace('?', np.NaN)
+cc_apps_test = cc_apps_test.replace('?', np.NaN)
+
+# mean imputation
+cc_apps_train.fillna(cc_apps_train.mean(), inplace=True)
+cc_apps_test.fillna(cc_apps_train.mean(), inplace=True)
+
+# number of NaNs in the datasets
+print(cc_apps_train.isnull().sum())
+print(cc_apps_test.isnull().sum())
+
+# column of cc_apps_train
+for col in cc_apps_train.columns:
+    # Check if the column is of object type
+    if cc_apps_train[col].dtypes == 'object':
+        # Impute with the most frequent value
+        cc_apps_train = cc_apps_train.fillna(cc_apps_train[col].value_counts().index[0])
+        cc_apps_test = cc_apps_test.fillna(cc_apps_train[col].value_counts().index[0])
+
+# number of NaNs in the dataset
+print(cc_apps_train.isnull().sum())
+print(cc_apps_test.isnull().sum())
+
+# the categorical features in the train
+cc_apps_train = pd.get_dummies(cc_apps_train)
+cc_apps_test = pd.get_dummies(cc_apps_test)
+
+# Reindex
+cc_apps_test = cc_apps_test.reindex(columns=cc_apps_train.columns, fill_value=0)
+
+# Import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
+
+# into separate variables
+X_train, y_train = cc_apps_train.iloc[:, :-1].values, cc_apps_train.iloc[:, [-1]].values
+X_test, y_test = cc_apps_test.iloc[:, :-1].values, cc_apps_test.iloc[:, [-1]].values
+
+# rescale X_train and X_test
+scaler = MinMaxScaler(feature_range=(0, 1))
+rescaledX_train = scaler.fit_transform(X_train)
+rescaledX_test = scaler.transform(X_test)
+
+# Import LogisticRegression
+from sklearn.linear_model import LogisticRegression
+
+# LogisticRegression classifier
+logreg = LogisticRegression()
+
+# logreg to the train set
+logreg.fit(rescaledX_train,y_train)
+
+# Import confusion_matrix
+from sklearn.metrics import confusion_matrix
+
+# logreg to predict instances from the test set and store it
+y_pred = logreg.predict(rescaledX_test)
+
+# accuracy score of logreg model
+print("Accuracy of logistic regression classifier: ", logreg.score(rescaledX_test,y_test))
+
+# confusion matrix of the logreg model
+confusion_matrix(y_test,y_pred)
+
+# Import GridSearchCV
+from sklearn.model_selection import GridSearchCV
+
+# grid of values for tol and max_iter
+tol = [0.01, 0.001 ,0.0001]
+max_iter = [100, 150, 200]
+
+# tol and max_iter
+param_grid = dict(tol=tol, max_iter=max_iter)
+
+# Instantiate GridSearchCV 
+grid_model = GridSearchCV(estimator=logreg, param_grid=param_grid, cv=5)
+
+# grid_model to the data
+grid_model_result = grid_model.fit(rescaledX_train, y_train)
+
+# results
+best_score, best_params = grid_model_result.best_score_, grid_model_result.best_params_
+print("Best: %f using %s" % (best_score, best_params))
+
+# best model
+best_model = grid_model_result.best_estimator_
+print("Accuracy of logistic regression classifier: ", best_model.score(rescaledX_test,y_test))
